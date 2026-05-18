@@ -1,5 +1,6 @@
 import { getSurveyConfig, getSurveyResponseCount, getSurveyResponses } from "@/lib/survey";
 import { isAdminAuthenticated } from "@/lib/auth";
+import { getPublicDatabaseError } from "@/lib/errors";
 import { AdminPanel } from "./admin-panel";
 import { LoginForm } from "./login-form";
 
@@ -33,7 +34,6 @@ export default async function AdminPage() {
 
     return <AdminPanel initialConfig={config} recentResponses={recentResponses} responseCount={responseCount} />;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Check DATABASE_URL and Postgres connectivity.";
-    return <SetupNotice message={message} />;
+    return <SetupNotice message={getPublicDatabaseError(error)} />;
   }
 }

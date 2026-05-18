@@ -56,3 +56,15 @@ The app creates the required tables automatically on first database access. The 
 ## Public repo notes
 
 Do not commit `.env`, `.env.local`, database dumps, exported spreadsheets, or `node_modules`. The included `.gitignore` already excludes those files. Only variables prefixed with `NEXT_PUBLIC_` are exposed to browser code in Next.js; this app does not use that prefix for the admin password.
+
+## Coolify deployment
+
+Add these environment variables to the application resource:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE"
+ADMIN_PASSWORD="your-admin-password"
+AUTH_SECRET="a-long-random-secret"
+```
+
+Use the internal connection string from the Coolify Postgres database resource. If the page says `getaddrinfo ENOTFOUND base`, the hostname in `DATABASE_URL` is wrong; it should usually be the database resource name or the internal host shown by Coolify, not `base`.

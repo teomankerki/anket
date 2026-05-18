@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { getSurveyConfig } from "@/lib/survey";
+import { getPublicDatabaseError } from "@/lib/errors";
 import { SurveyForm } from "./survey-form";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,6 @@ export default async function Home() {
       </main>
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Check DATABASE_URL and Postgres connectivity.";
-    return <SetupNotice message={message} />;
+    return <SetupNotice message={getPublicDatabaseError(error)} />;
   }
 }
