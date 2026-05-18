@@ -27,7 +27,8 @@ function createQuestion(type: QuestionType): SurveyQuestion {
     title: "",
     type,
     required: true,
-    options: type === "text" ? [] : ["Option 1", "Option 2"]
+    options: type === "text" ? [] : ["Option 1", "Option 2"],
+    allowOther: false
   };
 }
 
@@ -74,7 +75,8 @@ export function AdminPanel({
   function updateQuestionType(question: SurveyQuestion, type: QuestionType) {
     updateQuestion(question.id, {
       type,
-      options: type === "text" ? [] : question.options.length > 0 ? question.options : ["Option 1"]
+      options: type === "text" ? [] : question.options.length > 0 ? question.options : ["Option 1"],
+      allowOther: type !== "text" && question.allowOther
     });
   }
 
@@ -357,6 +359,14 @@ export function AdminPanel({
                     <Plus size={16} />
                     Option
                   </button>
+                  <label className="toggle-row option-extra-row">
+                    <input
+                      checked={question.allowOther}
+                      onChange={(event) => updateQuestion(question.id, { allowOther: event.target.checked })}
+                      type="checkbox"
+                    />
+                    Other text option
+                  </label>
                 </div>
               ) : null}
             </article>

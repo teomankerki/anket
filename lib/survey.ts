@@ -9,6 +9,7 @@ export type SurveyQuestion = {
   type: QuestionType;
   required: boolean;
   options: string[];
+  allowOther: boolean;
 };
 
 export type SurveyConfig = {
@@ -51,6 +52,7 @@ type SurveyResponseRow = {
 
 const defaultColor = "#2563eb";
 const supportedTypes = new Set<QuestionType>(["single", "multiple", "text"]);
+const otherPrefix = "Other:";
 
 function asString(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -124,7 +126,8 @@ export function normalizeSurveyConfig(input: unknown): SurveyConfig {
         title,
         type,
         required: Boolean(questionSource.required),
-        options
+        options,
+        allowOther: type !== "text" && Boolean(questionSource.allowOther)
       }
     ];
   });
@@ -178,29 +181,46 @@ export async function saveSurveyConfig(input: unknown) {
   } satisfies SurveyConfig;
 }
 
+function formatOtherAnswer(value: unknown) {
+  const otherText = normalizeText(value, "", 500);
+  return otherText ? `${otherPrefix} ${otherText}` : "";
+}
+
 function validateSingleAnswer(question: SurveyQuestion, value: unknown) {
-  const answer = asString(value).trim();
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  const answer = source ? asString(source.choice).trim() : asString(value).trim();
 
   if (!answer) {
     return question.required ? null : "";
+  }
+
+  if (answer === "__other__") {
+    const otherAnswer = question.allowOther ? formatOtherAnswer(source?.otherText) : "";
+    return otherAnswer || null;
   }
 
   return question.options.includes(answer) ? answer : null;
 }
 
 function validateMultipleAnswer(question: SurveyQuestion, value: unknown) {
-  const rawAnswers = Array.isArray(value) ? value : [];
+  const source = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  const rawAnswers = source && Array.isArray(source.choices) ? source.choices : Array.isArray(value) ? value : [];
   const answers = Array.from(new Set(rawAnswers.map((answer) => asString(answer).trim()).filter(Boolean)));
+  const selectedOptions = answers.filter((answer) => question.options.includes(answer));
+  const hasInvalidOption = selectedOptions.length !== answers.length;
+  const otherAnswer =
+    question.allowOther && Boolean(source?.otherSelected) ? formatOtherAnswer(source?.otherText) : "";
+  const finalAnswers = otherAnswer ? [...selectedOptions, otherAnswer] : selectedOptions;
 
-  if (answers.length === 0) {
+  if (finalAnswers.length === 0) {
     return question.required ? null : [];
   }
 
-  if (!answers.every((answer) => question.options.includes(answer))) {
+  if (hasInvalidOption) {
     return null;
   }
 
-  return answers;
+  return finalAnswers;
 }
 
 function validateTextAnswer(question: SurveyQuestion, value: unknown) {
@@ -293,7 +313,7 @@ function normalizeStoredAnswers(value: unknown) {
         required: Boolean(source.required),
         value:
           type === "multiple"
-            ? (Array.isArray(rawValue) ? rawValue.map((item) => normalizeText(item, "", 120)).filter(Boolean) : [])
+            ? (Array.isArray(rawValue) ? rawValue.map((item) => normalizeText(item, "", 600)).filter(Boolean) : [])
             : normalizeText(rawValue, "", 2000)
       }
     ] satisfies StoredAnswer[];

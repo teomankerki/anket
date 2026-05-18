@@ -3,7 +3,27 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { SurveyQuestion } from "@/lib/survey";
 
-type AnswerMap = Record<string, string | string[]>;
+type SingleOtherAnswer = {
+  choice: string;
+  otherText: string;
+};
+
+type MultipleOtherAnswer = {
+  choices: string[];
+  otherSelected: boolean;
+  otherText: string;
+};
+
+type AnswerValue = string | string[] | SingleOtherAnswer | MultipleOtherAnswer;
+type AnswerMap = Record<string, AnswerValue>;
+
+function isSingleOtherAnswer(value: AnswerValue | undefined): value is SingleOtherAnswer {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && "choice" in value);
+}
+
+function isMultipleOtherAnswer(value: AnswerValue | undefined): value is MultipleOtherAnswer {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && "choices" in value);
+}
 
 export function SurveyForm({ questions }: { questions: SurveyQuestion[] }) {
   const [answers, setAnswers] = useState<AnswerMap>({});
@@ -21,14 +41,68 @@ export function SurveyForm({ questions }: { questions: SurveyQuestion[] }) {
     setErrors((current) => ({ ...current, [questionId]: "" }));
   }
 
+  function updateSingleOther(questionId: string, patch: Partial<SingleOtherAnswer>) {
+    setAnswers((current) => {
+      const currentAnswer =
+        typeof current[questionId] === "object" && !Array.isArray(current[questionId])
+          ? (current[questionId] as Partial<SingleOtherAnswer>)
+          : {};
+
+      return {
+        ...current,
+        [questionId]: {
+          choice: currentAnswer.choice || "__other__",
+          otherText: currentAnswer.otherText || "",
+          ...patch
+        }
+      };
+    });
+    setErrors((current) => ({ ...current, [questionId]: "" }));
+  }
+
   function updateMultiple(questionId: string, value: string, checked: boolean) {
     setAnswers((current) => {
-      const currentValues = Array.isArray(current[questionId]) ? (current[questionId] as string[]) : [];
+      const currentAnswer = current[questionId];
+      const currentValues = Array.isArray(currentAnswer)
+        ? currentAnswer
+        : typeof currentAnswer === "object" && currentAnswer && "choices" in currentAnswer
+          ? (currentAnswer.choices as string[])
+          : [];
       const nextValues = checked
         ? Array.from(new Set([...currentValues, value]))
         : currentValues.filter((currentValue) => currentValue !== value);
 
+      if (typeof currentAnswer === "object" && currentAnswer && "choices" in currentAnswer) {
+        return { ...current, [questionId]: { ...currentAnswer, choices: nextValues } };
+      }
+
       return { ...current, [questionId]: nextValues };
+    });
+    setErrors((current) => ({ ...current, [questionId]: "" }));
+  }
+
+  function updateMultipleOther(questionId: string, patch: Partial<MultipleOtherAnswer>) {
+    setAnswers((current) => {
+      const currentAnswer = current[questionId];
+      const currentValues = Array.isArray(currentAnswer)
+        ? currentAnswer
+        : typeof currentAnswer === "object" && currentAnswer && "choices" in currentAnswer
+          ? (currentAnswer.choices as string[])
+          : [];
+      const currentOther =
+        typeof currentAnswer === "object" && currentAnswer && "choices" in currentAnswer
+          ? (currentAnswer as Partial<MultipleOtherAnswer>)
+          : {};
+
+      return {
+        ...current,
+        [questionId]: {
+          choices: currentValues,
+          otherSelected: Boolean(currentOther.otherSelected),
+          otherText: currentOther.otherText || "",
+          ...patch
+        }
+      };
     });
     setErrors((current) => ({ ...current, [questionId]: "" }));
   }
@@ -68,6 +142,9 @@ export function SurveyForm({ questions }: { questions: SurveyQuestion[] }) {
     <form className="survey-form" onSubmit={submitSurvey}>
       {questions.map((question, index) => {
         const questionError = errors[question.id];
+        const currentAnswer = answers[question.id];
+        const singleOtherAnswer = isSingleOtherAnswer(currentAnswer) ? currentAnswer : null;
+        const multipleOtherAnswer = isMultipleOtherAnswer(currentAnswer) ? currentAnswer : null;
 
         return (
           <fieldset className="question-block" key={question.id}>
@@ -102,13 +179,42 @@ export function SurveyForm({ questions }: { questions: SurveyQuestion[] }) {
                     <span>{option}</span>
                   </label>
                 ))}
+                {question.allowOther ? (
+                  <div className="other-choice">
+                    <label className="choice-row">
+                      <input
+                        checked={singleOtherAnswer?.choice === "__other__"}
+                        name={question.id}
+                        onChange={() => updateSingleOther(question.id, { choice: "__other__" })}
+                        required={question.required}
+                        type="radio"
+                      />
+                      <span>Other</span>
+                    </label>
+                    {singleOtherAnswer?.choice === "__other__" ? (
+                      <input
+                        aria-label={`${question.title} other answer`}
+                        className="other-input"
+                        onChange={(event) => updateSingleOther(question.id, { otherText: event.target.value })}
+                        placeholder="Enter your answer"
+                        required={question.required}
+                        type="text"
+                        value={singleOtherAnswer.otherText}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
             {question.type === "multiple" ? (
               <div className="option-list">
                 {question.options.map((option) => {
-                  const currentValues = Array.isArray(answers[question.id]) ? (answers[question.id] as string[]) : [];
+                  const currentValues = Array.isArray(currentAnswer)
+                    ? currentAnswer
+                    : multipleOtherAnswer
+                      ? multipleOtherAnswer.choices
+                      : [];
 
                   return (
                     <label className="choice-row" key={option}>
@@ -121,6 +227,31 @@ export function SurveyForm({ questions }: { questions: SurveyQuestion[] }) {
                     </label>
                   );
                 })}
+                {question.allowOther ? (
+                  <div className="other-choice">
+                    <label className="choice-row">
+                      <input
+                        checked={Boolean(multipleOtherAnswer?.otherSelected)}
+                        onChange={(event) =>
+                          updateMultipleOther(question.id, { otherSelected: event.target.checked })
+                        }
+                        type="checkbox"
+                      />
+                      <span>Other</span>
+                    </label>
+                    {multipleOtherAnswer?.otherSelected ? (
+                      <input
+                        aria-label={`${question.title} other answer`}
+                        className="other-input"
+                        onChange={(event) => updateMultipleOther(question.id, { otherText: event.target.value })}
+                        placeholder="Enter your answer"
+                        required={question.required}
+                        type="text"
+                        value={multipleOtherAnswer.otherText}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

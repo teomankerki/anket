@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Invalid password." }, { status: 401 });
     }
 
-    await createAdminSession();
+    await createAdminSession(request);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to log in.";

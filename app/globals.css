@@ -327,6 +327,16 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.other-choice {
+  display: grid;
+  gap: 8px;
+}
+
+.other-input {
+  margin-left: 30px;
+  width: calc(100% - 30px);
+}
+
 .survey-submit {
   width: min(100%, 220px);
 }
@@ -576,6 +586,10 @@ textarea {
 .option-editor-list {
   display: grid;
   gap: 10px;
+}
+
+.option-extra-row {
+  margin-top: 4px;
 }
 
 .option-editor {

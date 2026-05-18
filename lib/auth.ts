@@ -18,6 +18,24 @@ function sign(value: string) {
   return createHmac("sha256", getAuthSecret()).update(value).digest("base64url");
 }
 
+function shouldUseSecureCookie(request?: Request) {
+  if (process.env.AUTH_COOKIE_SECURE === "true") {
+    return true;
+  }
+
+  if (process.env.AUTH_COOKIE_SECURE === "false") {
+    return false;
+  }
+
+  const forwardedProto = request?.headers.get("x-forwarded-proto");
+
+  if (forwardedProto) {
+    return forwardedProto.split(",")[0]?.trim() === "https";
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
 function safeCompare(a: string, b: string) {
   const aBuffer = Buffer.from(a);
   const bBuffer = Buffer.from(b);
@@ -39,7 +57,7 @@ export function verifyAdminPassword(password: string) {
   return safeCompare(password, configuredPassword);
 }
 
-export async function createAdminSession() {
+export async function createAdminSession(request?: Request) {
   const payload = JSON.stringify({
     issuedAt: Date.now(),
     nonce: randomBytes(16).toString("base64url")
@@ -51,18 +69,18 @@ export async function createAdminSession() {
   cookieStore.set(cookieName, value, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(request),
     maxAge: maxAgeSeconds,
     path: "/"
   });
 }
 
-export async function clearAdminSession() {
+export async function clearAdminSession(request?: Request) {
   const cookieStore = await cookies();
   cookieStore.set(cookieName, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(request),
     maxAge: 0,
     path: "/"
   });

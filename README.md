@@ -68,3 +68,11 @@ AUTH_SECRET="a-long-random-secret"
 ```
 
 Use the internal connection string from the Coolify Postgres database resource. If the page says `getaddrinfo ENOTFOUND base`, the hostname in `DATABASE_URL` is wrong; it should usually be the database resource name or the internal host shown by Coolify, not `base`.
+
+If you deploy on plain HTTP while testing, admin login needs a non-secure cookie. The app auto-detects `x-forwarded-proto`, but you can force the behavior with:
+
+```bash
+AUTH_COOKIE_SECURE=false
+```
+
+Use `AUTH_COOKIE_SECURE=true` once the site is behind HTTPS.
